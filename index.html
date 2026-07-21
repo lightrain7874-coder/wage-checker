@@ -165,6 +165,7 @@
       <li>야간근로(22:00~06:00): 50% 가산 — 근로기준법 §56③</li>
       <li>공휴일 근로(사업장 실제 방식): 유급휴일수당 100% 별도 지급 없음. 실근로 임금 + 휴일가산(8h 이내 50%)만 — 근로기준법 §56①</li>
       <li>퇴직금: 1주 평균 소정근로 15시간 이상 + 계속근로 1년 이상. 계약서 문구가 15h 미만이어도 실태로 판단한 판례 있음(서울고법 2017누76410)</li>
+      <li>연차유급휴가: 1개월 개근 시 1일(1년 미만, 최대 11일) — §60②. 1년 이상은 15일 추가되나 <b>366일째 근로관계 존속</b>이 요건(대법원 2021다227100, 고용부 임금근로시간과-2861). 3년 이상 매 2년 1일 가산(총 25일 한도) — §60④. 단시간근로자는 통상근로자 연차일수 × (1주 소정근로시간÷40) × 8시간으로 <b>시간 단위</b> 산정, 1시간 미만 올림(시행령 별표2). 4주 평균 주 15시간 미만은 적용 제외 — §18③</li>
       <li>실업급여: 이직 전 18개월(초단시간 24개월) 내 피보험단위기간 180일 + 비자발적 이직 + 구직 의사. 퇴직 후 12개월 내 신청</li>
       <li>4대보험(2026, 근로자): 국민연금 4.75%, 건강 3.595%, 장기요양 건보료×12.95%, 고용 0.9%. 휴게시간은 주·야간 비례 배분 근사치. 정확한 판단은 고용노동부 1350 권장.</li>
     </ul>
@@ -334,8 +335,27 @@ function computeTools(){
   const s3=slips.reduce((a,[,n])=>a+n,0);
   const avgDaily=slips.length?s3/(slips.length*30.4):0;
   const severance=avgDaily*30*effYears;
+  // 연차유급휴가 (근로기준법 §60, 시행령 별표2)
+  const acEnd=last||TODAY;
+  const acEligible=avgWeekH>=15;                    // §18③ 초단시간(주 15h 미만)은 연차 적용 제외
+  let acMonths=0;
+  if(hire){
+    let m=(acEnd.getFullYear()-hire.getFullYear())*12+(acEnd.getMonth()-hire.getMonth());
+    if(acEnd.getDate()<hire.getDate())m--;          // 1개월 마친 '다음 날' 발생 (임금근로시간과-2861)
+    acMonths=Math.max(0,m);
+  }
+  const acMonthDays=Math.min(acMonths,11);          // §60② 1개월 개근당 1일, 최대 11일
+  const acYearOk=tenureDays>=366;                   // 366일째 근로관계 존속 필요 (대법 2021다227100)
+  const acSvcYears=Math.floor(tenureDays/365);
+  const acBonus=acSvcYears>=3?Math.min(10,Math.floor((acSvcYears-1)/2)):0; // §60④ 가산, 총 25일 한도
+  const acYearDays=acYearOk?15+acBonus:0;
+  const acDays=acMonthDays+acYearDays;
+  const acRatio=avgWeekH/40;                        // 통상근로자 1주 40시간 기준
+  const acHours=acEligible?Math.ceil(acDays*acRatio*8):0; // 시간 단위, 1시간 미만 올림
+  const acPay=acHours*wage;
   return {insured,need,remain,ppw,reach,
-    aSum,aCnt,tenureDays,tenureYears,effYears,ratio15,w15,wT,contractH,avgWeekH,passesAvg,gap,near,avgDaily,severance};
+    aSum,aCnt,tenureDays,tenureYears,effYears,ratio15,w15,wT,contractH,avgWeekH,passesAvg,gap,near,avgDaily,severance,
+    acEligible,acMonthDays,acYearOk,acYearDays,acDays,acHours,acPay};
 }
 
 /* ---- 렌더 ---- */
@@ -416,7 +436,7 @@ function renderTools(){
   if(!state.ui.tools){b.innerHTML="";return}
   const S=state.settings, T=computeTools(), tab=state.ui.toolTab;
   let inner=`<div class="segWrap toolTabs">
-    ${[["unemployment","실업급여"],["earnings","누적 급여"],["severance","퇴직금"]].map(([v,t])=>`<button class="seg ${tab===v?"on":""}" onclick="setTab('${v}')">${t}</button>`).join("")}
+    ${[["unemployment","실업급여"],["earnings","누적 급여"],["severance","퇴직금"],["annual","연차수당"]].map(([v,t])=>`<button class="seg ${tab===v?"on":""}" onclick="setTab('${v}')">${t}</button>`).join("")}
   </div>`;
   if(tab==="unemployment"){
     const pct=Math.min(100,(T.insured/T.need)*100);
@@ -439,7 +459,7 @@ function renderTools(){
       ${T.aCnt>0?`<div class="toolRow"><span>월 평균</span><b>${fmt(T.aSum/T.aCnt)}원</b></div>`:""}
       <p class="hint">각 달 명세 하단 "실제 명세서상 지급액"에 입력한 금액을 모두 더한 값이에요. 달을 넘겨가며 입력할수록 정확해져요.</p>
     </div>`;
-  }else{
+  }else if(tab==="severance"){
     const pct=Math.min(100,(T.avgWeekH/15)*100);
     inner+=`
     <div class="row">
@@ -461,6 +481,34 @@ function renderTools(){
       <div class="toolRow"><span>15h↑ 주</span><b>${T.w15}/${T.wT}주 (${Math.round(T.ratio15*100)}%)</b></div>
       <div class="bigStat"><span>예상 퇴직금 ${T.passesAvg&&T.effYears<1?"(1년 도달 시)":"(지금 기준)"}</span><b>${T.avgDaily>0&&T.passesAvg?(T.effYears>=1?`${fmt(T.severance)}원`:`약 ${fmt(T.avgDaily*30)}원/년`):"—"}</b></div>
       <p class="hint">판단: 근무한 주들의 1주 평균 소정근로가 15시간 이상이면(연 총근로÷52와 같은 개념) 전체 계속근로기간이 퇴직금 대상 — 근로기준정책과-4361·근로복지과-4042 해석. 계약서 문구가 15h 미만이어도 매주 반복적으로 그 이상 일하면 실태로 판단한 판례 있음(서울고법 2017누76410). 퇴직금 = 1일 평균임금 × 30 × (계속근로일수÷365), 1년 이상부터. 평균임금은 입력 명세서로 근사. 정확한 판단은 1350 상담 권장.</p>
+    </div>`;
+  }else{
+    const acPct=Math.min(100,(T.acMonthDays/11)*100);
+    inner+=`
+    <div class="row">
+      <label class="f">입사일<input type="date" value="${esc(S.hireDate)}" oninput="setS('hireDate',this.value)"></label>
+    </div>
+    <div class="toolBox">`;
+    if(!T.acEligible){
+      inner+=`<div class="diffBanner" style="background:#FBEAE7;color:#8C2B20">1주 평균 소정근로가 <b>${fmtH(T.avgWeekH)}시간</b>이에요. 4주 평균 15시간 미만인 <b>초단시간 근로자</b>는 연차유급휴가 적용에서 제외돼요(근로기준법 §18③). 주 15시간을 넘기면 그때부터 연차가 발생해요.</div>`;
+    }else{
+      inner+=`<div class="bigStat"><span>지금까지 발생한 연차</span><b style="color:#0E6B4F">${T.acHours}시간</b></div>
+      <div style="font-size:11px;color:#6C7871;margin-top:-2px">통상근로자 기준 ${T.acDays}일을 단시간 비례로 환산한 값이에요</div>
+      <div class="bigStat"><span>미사용 시 예상 연차수당</span><b>${fmt(T.acPay)}원</b></div>
+      <div class="toolRow" style="margin-top:6px"><span>계속근로일수</span><b>${T.tenureDays}일</b></div>
+      <div class="toolRow"><span>월단위 연차 (§60②)</span><b>${T.acMonthDays}일${T.acMonthDays>=11?" · 한도":""}</b></div>
+      <div class="toolRow"><span>연단위 연차 (§60①)</span><b>${T.acYearOk?T.acYearDays+"일":"미발생"}</b></div>
+      <div class="toolRow"><span>비례 환산식</span><b>${T.acDays}일 × (${fmtH(T.avgWeekH)}h÷40h) × 8h</b></div>
+      <div class="progressTrack" style="margin-top:10px"><div class="progressFill" style="width:${acPct}%;background:#0E6B4F"></div></div>
+      <div style="font-size:11px;color:#6C7871;margin-top:4px">월단위 연차 ${T.acMonthDays}/11일</div>`;
+      if(!T.acYearOk){
+        const left=Math.max(0,366-T.tenureDays);
+        inner+=`<div class="diffBanner" style="background:#FBF3E2;color:#7A5B12;margin-top:10px">아직 1년 미만이라 <b>월단위 연차만</b> 발생해요(최대 11일). <b>366일째</b>까지 근로관계가 이어져야 15일이 추가돼요 — 정확히 365일만 채우고 그만두면 15일은 발생하지 않아요(대법원 2021다227100).${left>0?` 앞으로 <b>${left}일</b> 남았어요.`:""}</div>`;
+      }else{
+        inner+=`<div class="diffBanner" style="background:#E7F2EC;color:#0F5B44;margin-top:10px">366일 요건을 넘겨 <b>연단위 연차 ${T.acYearDays}일</b>이 발생했어요. 1년 미만 구간의 월단위 연차 ${T.acMonthDays}일과 <b>합산</b>돼요(2017년 개정으로 차감 규정 삭제).</div>`;
+      }
+    }
+    inner+=`<p class="hint">단시간근로자 연차는 <b>시간 단위</b>로 산정해요 — 통상근로자 연차일수 × (1주 소정근로시간÷40시간) × 8시간, 1시간 미만은 올림(근로기준법 시행령 별표2). 수당은 미사용 시간 × 시급이에요. <b>주의</b>: 월단위 연차는 '1개월 개근'이 요건인데 이 앱은 결근 기록을 받지 않아 재직 개월 수로 계산했어요 — 결근한 달이 있으면 그만큼 빠져요. 연차는 발생일부터 1년 안 쓰면 소멸하고(§60⑦), 사업주가 연차사용촉진(§61)을 적법하게 했다면 미사용수당 의무가 없을 수 있어요. 정확한 판단은 1350 상담 권장.</p>
     </div>`;
   }
   b.innerHTML=inner;

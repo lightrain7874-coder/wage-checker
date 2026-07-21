@@ -63,11 +63,17 @@
   .rDivider{border-top:1px dashed #C9D0C9; margin:8px 0}
   .weekBox{margin-top:16px; background:#F3F6F2; border-radius:12px; padding:12px 12px 8px}
   .weekTitle{font-size:12.5px; font-weight:700; margin-bottom:8px}
-  .weekRow{display:flex; justify-content:space-between; gap:8px; font-size:12.5px; padding:5px 0; align-items:center}
-  .weekLabel{display:flex; gap:8px; align-items:center; font-weight:400}
-  .avgTag{font-size:10.5px; color:#0F5B44; background:#E4F0E9; border-radius:6px; padding:1px 6px; margin-left:6px; white-space:nowrap; font-weight:700}
+  .weekRow{display:flex; gap:10px; font-size:12.5px; padding:7px 0; align-items:center; border-bottom:1px solid rgba(0,0,0,.06)}
+  .weekRow:last-of-type{border-bottom:none}
+  .weekRow.ineligible{opacity:.65}
+  .weekLabel{display:flex; gap:8px; align-items:flex-start; font-weight:400; flex:1; min-width:0; cursor:pointer}
+  .weekLabel input{flex:none; width:16px; height:16px; margin-top:1px; padding:0; accent-color:#0F5B44}
+  .weekText{display:flex; flex-direction:column; gap:3px; min-width:0; word-break:keep-all}
+  .weekMain{font-weight:600}
+  .weekSub{display:flex; flex-wrap:wrap; gap:4px 6px; align-items:center}
+  .avgTag{font-size:10.5px; color:#0F5B44; background:#E4F0E9; border-radius:6px; padding:1px 6px; white-space:nowrap; font-weight:700}
   .weekNote{color:#8C2B20; font-style:normal; font-size:11.5px}
-  .weekAmt{font-weight:700; white-space:nowrap}
+  .weekAmt{font-weight:700; white-space:nowrap; margin-left:auto}
   .compareBox{margin-top:18px; border-top:2px solid var(--ink); padding-top:14px}
   .diffBanner{margin-top:10px; padding:12px 14px; border-radius:10px; font-size:13.5px; line-height:1.55}
   .toolBox{margin-top:14px; background:#F3F6F2; border-radius:12px; padding:14px 14px 10px}
@@ -557,8 +563,8 @@ function renderReceipt(){
     html+=`<div class="weekBox"><div class="weekTitle">주휴수당 상세 (월~일 단위)</div>`;
     R.weeks.forEach(w=>{
       const tag=wk?`이 주 ${fmtH(w.thisWeekH)}h`:`4주평균 ${fmtH(w.avgH)}h`;
-      const note=!w.eligible?` <em class="weekNote">— ${wk?"이 주 15h 미만":"평균 15h 미만"}, 미발생</em>`:"";
-      html+=`<div class="weekRow"><label class="weekLabel"><input type="checkbox" ${w.eligible&&!w.off?"checked":""} ${!w.eligible?"disabled":""} onchange="toggleWeek('${w.wk}',this.checked)"><span>${w.mon.getMonth()+1}/${w.mon.getDate()}~${w.sun.getMonth()+1}/${w.sun.getDate()} · 소정 ${fmtH(w.regH)}h<span class="avgTag">${tag}</span>${note}</span></label><span class="weekAmt">${w.amt?fmt(w.amt)+"원":"—"}</span></div>`;
+      const note=!w.eligible?`<em class="weekNote">${wk?"이 주 15h 미만":"평균 15h 미만"} · 미발생</em>`:"";
+      html+=`<div class="weekRow${!w.eligible?" ineligible":""}"><label class="weekLabel"><input type="checkbox" ${w.eligible&&!w.off?"checked":""} ${!w.eligible?"disabled":""} onchange="toggleWeek('${w.wk}',this.checked)"><span class="weekText"><span class="weekMain">${w.mon.getMonth()+1}/${w.mon.getDate()} ~ ${w.sun.getMonth()+1}/${w.sun.getDate()} · 소정 ${fmtH(w.regH)}h</span><span class="weekSub"><span class="avgTag">${tag}</span>${note}</span></span></label><span class="weekAmt">${w.amt?fmt(w.amt)+"원":"—"}</span></div>`;
     });
     html+=`<p class="hint">${wk?"개별 주 기준 — 그 주 소정근로가 15시간 이상이면 주휴 발생.":"4주 평균 15시간 이상이면 발생 (§18③)."} 결근한 주는 체크를 해제하세요.</p></div>`;
   }

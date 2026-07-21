@@ -192,7 +192,7 @@ let state={
   entries:{}, weekOff:{}, payslips:{},
   settings:{wage:MIN_WAGE,sojungH:8,juhyu:true,juhyuMode:"week",deduct:"none",
     cycleStart:1,payDay:10,defStart:"17:00",defEnd:"22:00",defBreak:30,
-    hireDate:"2026-03-31",leaveReason:"contract",contractSojungH:13.5},
+    hireDate:"2026-03-31",contractSojungH:13.5},
   ui:{settings:false,tools:false,toolTab:"unemployment",editing:null}
 };
 const LS="wage-calc-html-v1";
@@ -333,7 +333,7 @@ function computeTools(){
   const s3=slips.reduce((a,[,n])=>a+n,0);
   const avgDaily=slips.length?s3/(slips.length*30.4):0;
   const severance=avgDaily*30*effYears;
-  return {insured,need,remain,ppw,reach,leaveOk:S.leaveReason==="contract",
+  return {insured,need,remain,ppw,reach,
     aSum,aCnt,tenureDays,tenureYears,effYears,ratio15,w15,wT,contractH,avgWeekH,passesAvg,gap,near,avgDaily,severance};
 }
 
@@ -422,17 +422,12 @@ function renderTools(){
     inner+=`
     <div class="row">
       <label class="f">입사일<input type="date" value="${esc(S.hireDate)}" oninput="setS('hireDate',this.value)"></label>
-      <label class="f">퇴사 사유
-        <div class="segWrap">
-          ${[["contract","계약만료(비자발)"],["voluntary","자발적 퇴사"]].map(([v,t])=>`<button class="seg ${S.leaveReason===v?"on":""}" onclick="setS('leaveReason','${v}')">${t}</button>`).join("")}
-        </div>
-      </label>
     </div>
     <div class="toolBox">
       <div class="toolRow"><span>피보험단위기간 (보수지급 기초일수)</span><b>${T.insured}일 / ${T.need}일</b></div>
       <div class="progressTrack"><div class="progressFill" style="width:${pct}%;background:${T.insured>=T.need?"#0E6B4F":"#C99A2E"}"></div></div>
       ${T.insured>=T.need
-        ?`<div class="diffBanner" style="background:#E7F2EC;color:#0F5B44;margin-top:10px">180일 요건을 충족했어요 ✓ ${T.leaveOk?"계약만료(비자발) 사유이니 구직 의사가 있으면 실업급여 신청 대상이에요.":"다만 자발적 퇴사는 원칙적으로 대상이 아니에요(정당한 사유 예외 별도)."}</div>`
+        ?`<div class="diffBanner" style="background:#E7F2EC;color:#0F5B44;margin-top:10px">180일 요건을 충족했어요 ✓ 비자발적 이직(계약만료·권고사직 등)이고 구직 의사가 있으면 실업급여 신청 대상이에요. 자발적 퇴사는 원칙적으로 제외돼요(정당한 사유 예외 별도).</div>`
         :`<div class="diffBanner" style="background:#FBF3E2;color:#7A5B12;margin-top:10px">아직 ${T.remain}일 부족해요.${T.reach?` 지금 페이스(주 ${fmtH(T.ppw)}일 유급)라면 대략 ${T.reach.getFullYear()}년 ${T.reach.getMonth()+1}월 ${T.reach.getDate()}일경 충족 예상이에요.`:" 근무 기록을 더 입력하면 도달 시점을 추정해줄게요."}</div>`}
       <p class="hint">피보험단위기간은 근로일 + 유급주휴일의 합이에요(무급휴무일 제외). 초단시간 근로자는 이직 전 24개월 안에서 180일을 채우면 돼요. 실제 인정일수는 이직확인서 신고 기준이라 다를 수 있어요.</p>
     </div>`;

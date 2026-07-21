@@ -565,20 +565,39 @@ function renderReceipt(){
     html+=`<p class="hint">${wk?"개별 주 기준 — 그 주 소정근로가 15시간 이상이면 주휴 발생.":"4주 평균 15시간 이상이면 발생 (§18③)."} 결근한 주는 체크를 해제하세요.</p></div>`;
   }
   // 명세서 비교
+  const psDigits=String(state.payslips[psKey]||"").replace(/[^0-9]/g,"");
+  const psVal=psDigits?Number(psDigits).toLocaleString("ko-KR"):"";
   html+=`<div class="compareBox"><label class="f">실제 명세서상 지급액 (원)
-    <input inputmode="numeric" placeholder="예: 854,000" value="${esc(state.payslips[psKey]||"")}" oninput="setPayslip('${psKey}',this.value)"></label>`;
-  if(diff!==null){
-    const bg=diff>0?"#FBEAE7":"#E7F2EC", col=diff>0?"#8C2B20":"#0F5B44";
-    let msg=diff>0?`법정 기준보다 <b>${fmt(diff)}원 적게</b> 받았어요. 산정 내역을 확인해보세요.`
-      :diff<0?`법정 기준보다 <b>${fmt(-diff)}원 더</b> 받았어요. 문제 없어요 👍`
-      :`법정 기준과 정확히 일치해요 ✓`;
-    html+=`<div class="diffBanner" style="background:${bg};color:${col}">${msg}</div>`;
-  }
+    <input inputmode="numeric" placeholder="예: 854,000" value="${esc(psVal)}" oninput="onPayslipInput(this,'${psKey}')"></label>`;
+  html+=`<div id="payslipDiff">${diffBannerHTML(diff)}</div>`;
   html+=`</div>`;
   document.getElementById("receipt").innerHTML=html;
 }
+function diffBannerHTML(diff){
+  if(diff===null)return "";
+  const bg=diff>0?"#FBEAE7":"#E7F2EC", col=diff>0?"#8C2B20":"#0F5B44";
+  const msg=diff>0?`법정 기준보다 <b>${fmt(diff)}원 적게</b> 받았어요. 산정 내역을 확인해보세요.`
+    :diff<0?`법정 기준보다 <b>${fmt(-diff)}원 더</b> 받았어요. 문제 없어요 👍`
+    :`법정 기준과 정확히 일치해요 ✓`;
+  return `<div class="diffBanner" style="background:${bg};color:${col}">${msg}</div>`;
+}
 function toggleWeek(wk,checked){state.weekOff[wk]=!checked;render()}
-function setPayslip(k,v){state.payslips[k]=v;render()}
+function onPayslipInput(el,key){
+  const caret=el.selectionStart;
+  const digitsBeforeCaret=el.value.slice(0,caret).replace(/[^0-9]/g,"").length;
+  const digits=el.value.replace(/[^0-9]/g,"");
+  const formatted=digits?Number(digits).toLocaleString("ko-KR"):"";
+  el.value=formatted;
+  // 콤마 삽입 후 커서 위치를 입력한 숫자 개수 기준으로 복원
+  let pos=0,seen=0;
+  while(pos<formatted.length&&seen<digitsBeforeCaret){if(formatted[pos]>="0"&&formatted[pos]<="9")seen++;pos++}
+  el.setSelectionRange(pos,pos);
+  state.payslips[key]=formatted;
+  save();
+  const R=compute(), actual=Number(digits)||0;
+  const box=document.getElementById("payslipDiff");
+  if(box)box.innerHTML=diffBannerHTML(actual?Math.round(R.net)-actual:null);
+}
 
 /* ---- 내보내기 / 불러오기 ---- */
 function exportData(){
